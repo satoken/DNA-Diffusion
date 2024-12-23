@@ -19,6 +19,8 @@ def create_sample(
     save_timesteps: bool = False,
     save_dataframe: bool = False,
     generate_attention_maps: bool = False,
+    length: int = 200,
+    output_prefix: str = "final",
 ):
     nucleotides = ["A", "C", "G", "T"]
     final_sequences = []
@@ -33,35 +35,38 @@ def create_sample(
 
         if generate_attention_maps:
             sampled_images, cross_att_values = diffusion_model.sample_cross(
-                classes, (sample_bs, 1, 4, 200), cond_weight_to_metric
+                classes, (sample_bs, 1, 4, length), cond_weight_to_metric
             )
             # save cross attention maps in a numpy array
             np.save(f"cross_att_values_{conditional_numeric_to_tag[group_number]}.npy", cross_att_values)
 
         else:
-            sampled_images = diffusion_model.sample(classes, (sample_bs, 1, 4, 200), cond_weight_to_metric)
+            sampled_images = diffusion_model.sample(classes, (sample_bs, 1, 4, length), cond_weight_to_metric)
 
         if save_timesteps:
             seqs_to_df = {}
             for en, step in enumerate(sampled_images):
-                seqs_to_df[en] = [convert_to_seq(x, nucleotides) for x in step]
+                seqs_to_df[en] = [convert_to_seq(x, nucleotides, length) for x in step]
             final_sequences.append(pd.DataFrame(seqs_to_df))
 
         if save_dataframe:
             # Only using the last timestep
             for en, step in enumerate(sampled_images[-1]):
-                final_sequences.append(convert_to_seq(step, nucleotides))
+                final_sequences.append(convert_to_seq(step, nucleotides, length))
         else:
             for n_b, x in enumerate(sampled_images[-1]):
                 seq_final = f">seq_test_{n_a}_{n_b}\n" + "".join(
-                    [nucleotides[s] for s in np.argmax(x.reshape(4, 200), axis=0)]
+                    [nucleotides[s] for s in np.argmax(x.reshape(4, length), axis=0)]
                 )
                 final_sequences.append(seq_final)
+            motifs = open("synthetic_motifs.fasta", "w")
+            motifs.write("\n".join(final_sequences))
+            motifs.close()
 
     if save_timesteps:
         # Saving dataframe containing sequences for each timestep
         pd.concat(final_sequences, ignore_index=True).to_csv(
-            f"final_{conditional_numeric_to_tag[group_number]}.txt",
+            f"{output_prefix}_{conditional_numeric_to_tag[group_number]}.txt",
             header=True,
             sep="\t",
             index=False,
@@ -70,12 +75,14 @@ def create_sample(
 
     if save_dataframe:
         # Saving list of sequences to txt file
-        with open(f"final_{conditional_numeric_to_tag[group_number]}.txt", "w") as f:
-            f.write("\n".join(final_sequences))
+        with open(f"{output_prefix}_{conditional_numeric_to_tag[group_number]}.txt", "w") as f:
+            for i, s in enumerate(final_sequences):
+                f.write(f">{conditional_numeric_to_tag[group_number]}_{i}\n")
+                f.write(s+"\n")
         return
 
-    df_motifs_count_syn = extract_motifs(final_sequences)
-    return df_motifs_count_syn
+    # df_motifs_count_syn = extract_motifs(final_sequences)
+    # return df_motifs_count_syn
 
 
 def extract_motifs(sequence_list: list):
@@ -83,7 +90,7 @@ def extract_motifs(sequence_list: list):
     motifs = open("synthetic_motifs.fasta", "w")
     motifs.write("\n".join(sequence_list))
     motifs.close()
-    os.system("gimme scan synthetic_motifs.fasta -p JASPAR2020_vertebrates -g hg38 -n 20> syn_results_motifs.bed")
+    os.system("gimme scan synthetic_motifs.fasta -p JASPAR2020_vertebrates -g hg38 -n 20 > syn_results_motifs.bed")
     df_results_syn = pd.read_csv("syn_results_motifs.bed", sep="\t", skiprows=5, header=None)
 
     df_results_syn["motifs"] = df_results_syn[8].apply(lambda x: x.split('motif_name "')[1].split('"')[0])

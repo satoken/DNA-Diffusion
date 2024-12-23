@@ -109,9 +109,6 @@ class TrainLoop:
         if self.accelerator.is_main_process:
             self.accelerator.log(
                 {
-                    "train": self.train_kl,
-                    "test": self.test_kl,
-                    "shuffle": self.shuffle_kl,
                     "loss": loss.mean().item(),
                     "epoch": epoch,
                     "seq_similarity": self.seq_similarity,
@@ -129,15 +126,10 @@ class TrainLoop:
             conditional_numeric_to_tag=self.encode_data["numeric_to_tag"],
             cell_types=self.encode_data["cell_types"],
             number_of_samples=int(self.num_sampling_to_compare_cells / 10),
+            length = self.image_size
         )
-        self.seq_similarity = generate_similarity_using_train(self.encode_data["X_train"])
-        self.train_kl = compare_motif_list(synt_df, self.encode_data["train_motifs"])
-        self.test_kl = compare_motif_list(synt_df, self.encode_data["test_motifs"])
-        self.shuffle_kl = compare_motif_list(synt_df, self.encode_data["shuffle_motifs"])
+        self.seq_similarity = generate_similarity_using_train(self.encode_data["X_train"], seq_len=self.image_size)
         print("Similarity", self.seq_similarity, "Similarity")
-        print("KL_TRAIN", self.train_kl, "KL")
-        print("KL_TEST", self.test_kl, "KL")
-        print("KL_SHUFFLE", self.shuffle_kl, "KL")
 
     def save_model(self, epoch):
         checkpoint_dict = {

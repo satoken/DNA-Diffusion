@@ -59,12 +59,19 @@ def extract(a, t, x_shape, device=None):
 
 def one_hot_encode(seq, alphabet, max_seq_len):
     """One-hot encode a sequence."""
-    seq_len = len(seq)
+    seq_len = min(len(seq), max_seq_len)
     seq_array = np.zeros((max_seq_len, len(alphabet)))
     for i in range(seq_len):
         seq_array[i, alphabet.index(seq[i])] = 1
     return seq_array
 
+def one_hot_encode_r(seq, alphabet, max_seq_len):
+    """One-hot encode a sequence."""
+    seq_len = min(len(seq), max_seq_len)
+    seq_array = np.zeros((max_seq_len, len(alphabet)))
+    for i in range(-seq_len, 0):
+        seq_array[i, alphabet.index(seq[i])] = 1
+    return seq_array
 
 def encode(seq, alphabet):
     """Encode a sequence."""
@@ -138,5 +145,13 @@ def sigmoid_beta_schedule(timesteps: int):
     return torch.sigmoid(betas) * (beta_end - beta_start) + beta_start
 
 
-def convert_to_seq(x, alphabet):
-    return "".join([alphabet[i] for i in np.argmax(x.reshape(4, 200), axis=0)])
+def convert_to_seq(x, alphabet, length):
+    x = x.reshape(4, length)
+    x_max = np.max(x, axis=0)
+    start_i = 0
+    for i, v in enumerate(x_max):
+        if v<0:
+            start_i = i+1
+
+    seq = "".join([alphabet[i] for i in np.argmax(x, axis=0)])
+    return seq[start_i:]

@@ -81,11 +81,11 @@ def generate_heatmap(df_heat: pd.DataFrame, x_label: str, y_label: str, cell_lis
     plt.savefig(f"./{x_label}_{y_label}_kl_heatmap.png")
 
 
-def generate_similarity_metric():
+def generate_similarity_metric(seq_len=200):
     """Capture the syn_motifs.fasta and compare with the  dataset motifs"""
     nucleotides = ["A", "C", "G", "T"]
     seqs_file = open("synthetic_motifs.fasta").readlines()
-    seqs_to_hotencoder = [one_hot_encode(s.replace("\n", ""), nucleotides, 200).T for s in seqs_file if ">" not in s]
+    seqs_to_hotencoder = [one_hot_encode(s.replace("\n", ""), nucleotides, seq_len).T for s in seqs_file if ">" not in s]
 
     return seqs_to_hotencoder
 
@@ -99,8 +99,8 @@ def calculate_mean_similarity(database, input_query_seqs, seq_len=200):
     return final_base_max_match / seq_len
 
 
-def generate_similarity_using_train(X_train_in):
+def generate_similarity_using_train(X_train_in, seq_len=200):
     convert_X_train = X_train_in.copy()
     convert_X_train[convert_X_train == -1] = 0
-    generated_seqs_to_similarity = generate_similarity_metric()
+    generated_seqs_to_similarity = generate_similarity_metric(seq_len=seq_len)
     return calculate_mean_similarity(convert_X_train, generated_seqs_to_similarity)

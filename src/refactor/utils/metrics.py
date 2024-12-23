@@ -107,7 +107,7 @@ def sampling_to_metric(
         )
         for n_b, x in enumerate(sampled_images[-1]):
             seq_final = f">seq_test_{n_a}_{n_b}\n" + "".join(
-                [nucleotides[s] for s in np.argmax(x.reshape(4, 200), axis=0)]
+                [nucleotides[s] for s in np.argmax(x.reshape(4, image_size), axis=0)]
             )
             final_sequences.append(seq_final)
 

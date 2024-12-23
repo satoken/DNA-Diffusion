@@ -22,7 +22,7 @@ class UNet(nn.Module):
         super().__init__()
 
         # determine dimensions
-
+        self.dim = dim
         channels = 1
         self.channels = channels
         # if you want to do self conditioning uncomment this
@@ -33,7 +33,7 @@ class UNet(nn.Module):
         self.init_conv = nn.Conv2d(input_channels, init_dim, (7, 7), padding=3)
         dims = [init_dim, *(dim * m for m in dim_mults)]
 
-        in_out = list(zip(dims[:-1], dims[1:]))
+        in_out = list(itertools.pairwise(dims))
         block_klass = partial(ResnetBlock, groups=resnet_block_groups)
 
         # time embeddings
@@ -92,7 +92,7 @@ class UNet(nn.Module):
         self.final_res_block = block_klass(dim * 2, dim, time_emb_dim=time_dim)
         self.final_conv = nn.Conv2d(dim, 1, 1)
         self.cross_attn = EfficientAttention(
-            dim=200,
+            dim=self.dim,
             dim_head=64,
             heads=1,
             memory_efficient=True,
@@ -146,14 +146,14 @@ class UNet(nn.Module):
 
         x = self.final_res_block(x, t_end)
         x = self.final_conv(x)
-        x_reshaped = x.reshape(-1, 4, 200)
-        t_cross_reshaped = t_cross.reshape(-1, 4, 200)
+        x_reshaped = x.reshape(-1, 4, self.dim)
+        t_cross_reshaped = t_cross.reshape(-1, 4, self.dim)
 
         crossattention_out = self.cross_attn(
-            self.norm_to_cross(x_reshaped.reshape(-1, 800)).reshape(-1, 4, 200),
+            self.norm_to_cross(x_reshaped.reshape(-1, self.dim*4)).reshape(-1, 4, self.dim),
             context=t_cross_reshaped,
         )  # (-1,1, 4, 200)
-        crossattention_out = crossattention_out.view(-1, 1, 4, 200)
+        crossattention_out = crossattention_out.view(-1, 1, 4, self.dim)
         x = x + crossattention_out
         if self.output_attention:
             return x, crossattention_out

@@ -2,19 +2,18 @@ import argparse
 
 import torch
 
-from dnadiffusion.data.dataloader import load_data
+from dnadiffusion.data.dataloader import load_data_deg
 from dnadiffusion.metrics.metrics import generate_heatmap, kl_heatmap
 from dnadiffusion.models.diffusion import Diffusion
 from dnadiffusion.models.unet import UNet
 from dnadiffusion.utils.sample_util import create_sample
 
 
-def sample(model_path: str, num_samples: int = 1000, length: int = 200):
+def sample(model_path: str, num_samples: int = 1000, length: int = 200, output_prefix: str = "final"):
     # Instantiating data and model
     print("Loading data")
-    data = load_data(
-        #data_path="FiveSpecies_Cao_allutr_with_energy_structure.fasta",
-        data_path="./data/4.1_train_data_GSM3130435_egfp_unmod_1_BiologyFeatures.csv",
+    data = load_data_deg(
+        data_path="./data/train.json",
         #num_sampling_to_compare_cells=1000,
     )
 
@@ -57,6 +56,7 @@ def sample(model_path: str, num_samples: int = 1000, length: int = 200):
             save_timesteps=False,
             save_dataframe=True,
             length=length,
+            output_prefix=output_prefix,
         )
 
 
@@ -65,6 +65,7 @@ if __name__ == "__main__":
     parser.add_argument("--model", help="model file")
     parser.add_argument("--num-samples", type=int, default=1000, help="the number of samples")
     parser.add_argument("--length", type=int, default=200, help="sequence length")
+    parser.add_argument("--prefix", type=str, default="final_deg", help="prefix for the output file")
     args = parser.parse_args()
 
-    sample(model_path=args.model, num_samples=args.num_samples, length=args.length)
+    sample(model_path=args.model, num_samples=args.num_samples, length=args.length, output_prefix=args.prefix)

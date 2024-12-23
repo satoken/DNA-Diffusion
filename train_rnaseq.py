@@ -2,7 +2,7 @@ import argparse
 
 from accelerate import Accelerator
 
-from dnadiffusion.data.dataloader import load_data
+from dnadiffusion.data.dataloader import load_data_rnaseq
 from dnadiffusion.models.diffusion import Diffusion
 from dnadiffusion.models.unet import UNet
 from dnadiffusion.utils.train_util import TrainLoop
@@ -12,8 +12,8 @@ def train(batch_size: int, epochs: int, save_epoch: int, length: int, model_name
     accelerator = Accelerator(split_batches=True, log_with=["wandb"])
     accelerator.init_trackers(project_name="dnadiffusion", init_kwargs={"wandb": {"mode": "offline"}})
 
-    data = load_data(
-        data_path="./data/4.1_train_data_GSM3130435_egfp_unmod_1_BiologyFeatures.csv",
+    data = load_data_rnaseq(
+        data_path="./data/HEK_sequence.csv",
         max_seq_len=length,
         #num_sampling_to_compare_cells=1000,
     )
@@ -51,7 +51,7 @@ if __name__ == "__main__":
     parser.add_argument("--epochs", type=int, default=10000, help="the number of epochs")
     parser.add_argument("--save-epoch", type=int, default=500, help="the interval of saving the model")
     parser.add_argument("--length", type=int, default=200, help="sequence length")
-    parser.add_argument("--model-name", type=str, default="5utr", help="model name")
+    parser.add_argument("--model-name", type=str, default="5utr_rnaseq", help="model name")
     args = parser.parse_args()
 
     train(batch_size=args.batch_size, epochs=args.epochs, save_epoch=args.save_epoch, length=args.length, model_name=args.model_name)
