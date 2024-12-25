@@ -8,241 +8,32 @@ import numpy as np
 import pandas as pd
 import torch
 import torchvision.transforms as T
-from Bio import SeqIO
 from torch.utils.data import DataLoader, Dataset
 
-from dnadiffusion.utils.utils import one_hot_encode_r
+from dnadiffusion.utils.utils import one_hot_encode
 
 
-def load_data_mfe(
-    data_path: str = "FiveSpecies_Cao_allutr_with_energy_structure.fasta",
+def load_data(
+    df: pd.DataFrame,
     max_seq_len: int = 200,
-    limit_total_sequences: int = 0,
-    num_sampling_to_compare_cells: int = 1000,
+    right_aligned: bool = False,
+    tag_name: str = "TAG",
 ):
-    # Preprocessing data
-    mfes, seqs = [], []
-    for record in SeqIO.parse(data_path, "fasta"):
-        mfe = float(record.id.split("|")[0])
-        mfes.append(mfe)
-        seqs.append(str(record.seq))
-    df = pd.DataFrame({"MFE": mfes, "sequence": seqs})
-    df["len"] = df["sequence"].apply(len)
-    df["AVG MFE"] = df["MFE"] / df["len"]
-    df["TAG"] = "middle"
-    am_mean = df["AVG MFE"].mean()
-    am_std = df["AVG MFE"].std()
-    df.loc[df["AVG MFE"]>am_mean+am_std, ["TAG"]] = "high"
-    df.loc[df["AVG MFE"]<am_mean-am_std, ["TAG"]] = "low"
-
     # Creating sequence dataset
     nucleotides = ["A", "C", "G", "T"]
-    x_train_seq = np.array([one_hot_encode_r(x, nucleotides, max_seq_len=max_seq_len) for x in df["sequence"] if "N" not in x])
+    valid_indices = df["sequence"].apply(lambda x: "N" not in x)
+    x_train_seq = np.array([one_hot_encode(x, nucleotides, max_seq_len=max_seq_len, right_aligned=right_aligned) for x in df["sequence"][valid_indices]])
     X_train = np.array([x.T.tolist() for x in x_train_seq])
     X_train[X_train == 0] = -1
 
     # Creating labels
-    tag_to_numeric = {x: n for n, x in enumerate(df["TAG"].unique(), 1)}
-    numeric_to_tag = dict(enumerate(df["TAG"].unique(), 1))
+    tag_to_numeric = {x: n for n, x in enumerate(df[tag_name][valid_indices].unique(), 1)}
+    numeric_to_tag = dict(enumerate(df[tag_name][valid_indices].unique(), 1))
     cell_types = list(numeric_to_tag.keys())
-    x_train_cell_type = torch.tensor([tag_to_numeric[x] for x in df["TAG"]])
+    x_train_cell_type = torch.tensor([tag_to_numeric[x] for x in df[tag_name][valid_indices]])
 
     # Collecting variables into a dict
     encode_data_dict = {
-        # "train_motifs": train_motifs,
-        # "train_motifs_cell_specific": train_motifs_cell_specific,
-        # "test_motifs": test_motifs,
-        # "test_motifs_cell_specific": test_motifs_cell_specific,
-        # "shuffle_motifs": shuffle_motifs,
-        # "shuffle_motifs_cell_specific": shuffle_motifs_cell_specific,
-        "tag_to_numeric": tag_to_numeric,
-        "numeric_to_tag": numeric_to_tag,
-        "cell_types": cell_types,
-        "X_train": X_train,
-        "x_train_cell_type": x_train_cell_type,
-    }
-
-    return encode_data_dict
-
-
-def load_data_rnaseq(
-    data_path: str = "./data/HEK_sequence.csv",
-    max_seq_len: int = 200,
-    limit_total_sequences: int = 0,
-    num_sampling_to_compare_cells: int = 1000,
-):
-    # Preprocessing data
-    df = pd.read_csv(data_path)
-    df = pd.DataFrame({"rnaseq_log": df["rnaseq_log"], "sequence": df["utr"]})
-    df["sequence"] = df["sequence"].str.replace("<pad>", "")
-    df["len"] = df["sequence"].apply(len)
-    #df["AVG rl"] = df["rl"] / df["len"]
-    df = df[df["len"]>=max_seq_len]
-    df["TAG"] = "middle"
-    df.loc[df["rnaseq_log"]<df["rnaseq_log"].quantile(0.33), ["TAG"]] = "low"
-    df.loc[df["rnaseq_log"]>df["rnaseq_log"].quantile(0.66), ["TAG"]] = "high"
-
-    # Creating sequence dataset
-    nucleotides = ["A", "C", "G", "T"]
-    x_train_seq = np.array([one_hot_encode_r(x, nucleotides, max_seq_len=max_seq_len) for x in df["sequence"] if "N" not in x])
-    X_train = np.array([x.T.tolist() for x in x_train_seq])
-    X_train[X_train == 0] = -1
-
-    # Creating labels
-    tag_to_numeric = {x: n for n, x in enumerate(df["TAG"].unique(), 1)}
-    numeric_to_tag = dict(enumerate(df["TAG"].unique(), 1))
-    cell_types = list(numeric_to_tag.keys())
-    x_train_cell_type = torch.tensor([tag_to_numeric[x] for x in df["TAG"]])
-
-    # Collecting variables into a dict
-    encode_data_dict = {
-        # "train_motifs": train_motifs,
-        # "train_motifs_cell_specific": train_motifs_cell_specific,
-        # "test_motifs": test_motifs,
-        # "test_motifs_cell_specific": test_motifs_cell_specific,
-        # "shuffle_motifs": shuffle_motifs,
-        # "shuffle_motifs_cell_specific": shuffle_motifs_cell_specific,
-        "tag_to_numeric": tag_to_numeric,
-        "numeric_to_tag": numeric_to_tag,
-        "cell_types": cell_types,
-        "X_train": X_train,
-        "x_train_cell_type": x_train_cell_type,
-    }
-
-    return encode_data_dict
-
-
-def load_data_te(
-    data_path: str = "./data/HEK_sequence.csv",
-    max_seq_len: int = 200,
-    limit_total_sequences: int = 0,
-    num_sampling_to_compare_cells: int = 1000,
-):
-    # Preprocessing data
-    df = pd.read_csv(data_path)
-    df = pd.DataFrame({"te_log": df["te_log"], "sequence": df["utr"]})
-    df["sequence"] = df["sequence"].str.replace("<pad>", "")
-    df["len"] = df["sequence"].apply(len)
-    #df["AVG rl"] = df["rl"] / df["len"]
-    df = df[df["len"]>=max_seq_len]
-    df["TAG"] = "middle"
-    te_mean = df["te_log"].mean()
-    te_std = df["te_log"].std()
-    df.loc[df["te_log"]<te_mean-te_std, ["TAG"]] = "low"
-    df.loc[df["te_log"]>te_mean+te_std, ["TAG"]] = "high"
-
-    # Creating sequence dataset
-    nucleotides = ["A", "C", "G", "T"]
-    x_train_seq = np.array([one_hot_encode_r(x, nucleotides, max_seq_len=max_seq_len) for x in df["sequence"] if "N" not in x])
-    X_train = np.array([x.T.tolist() for x in x_train_seq])
-    X_train[X_train == 0] = -1
-
-    # Creating labels
-    tag_to_numeric = {x: n for n, x in enumerate(df["TAG"].unique(), 1)}
-    numeric_to_tag = dict(enumerate(df["TAG"].unique(), 1))
-    cell_types = list(numeric_to_tag.keys())
-    x_train_cell_type = torch.tensor([tag_to_numeric[x] for x in df["TAG"]])
-
-    # Collecting variables into a dict
-    encode_data_dict = {
-        # "train_motifs": train_motifs,
-        # "train_motifs_cell_specific": train_motifs_cell_specific,
-        # "test_motifs": test_motifs,
-        # "test_motifs_cell_specific": test_motifs_cell_specific,
-        # "shuffle_motifs": shuffle_motifs,
-        # "shuffle_motifs_cell_specific": shuffle_motifs_cell_specific,
-        "tag_to_numeric": tag_to_numeric,
-        "numeric_to_tag": numeric_to_tag,
-        "cell_types": cell_types,
-        "X_train": X_train,
-        "x_train_cell_type": x_train_cell_type,
-    }
-
-    return encode_data_dict
-
-
-def load_data_rl(
-    data_path: str = "./data/4.1_train_data_GSM3130435_egfp_unmod_1_BiologyFeatures.csv",
-    max_seq_len: int = 200,
-    limit_total_sequences: int = 0,
-    num_sampling_to_compare_cells: int = 1000,
-):
-    # Preprocessing data
-    df = pd.read_csv(data_path)
-    df = pd.DataFrame({"rl": df["rl"], "sequence": df["utr"]})
-    df["len"] = df["sequence"].apply(len)
-    df["AVG rl"] = df["rl"] / df["len"]
-    df["TAG"] = "high"
-    df.loc[df["rl"]<6.0, ["TAG"]] = "low"
-
-    # Creating sequence dataset
-    nucleotides = ["A", "C", "G", "T"]
-    x_train_seq = np.array([one_hot_encode_r(x, nucleotides, max_seq_len=max_seq_len) for x in df["sequence"] if "N" not in x])
-    X_train = np.array([x.T.tolist() for x in x_train_seq])
-    X_train[X_train == 0] = -1
-
-    # Creating labels
-    tag_to_numeric = {x: n for n, x in enumerate(df["TAG"].unique(), 1)}
-    numeric_to_tag = dict(enumerate(df["TAG"].unique(), 1))
-    cell_types = list(numeric_to_tag.keys())
-    x_train_cell_type = torch.tensor([tag_to_numeric[x] for x in df["TAG"]])
-
-    # Collecting variables into a dict
-    encode_data_dict = {
-        # "train_motifs": train_motifs,
-        # "train_motifs_cell_specific": train_motifs_cell_specific,
-        # "test_motifs": test_motifs,
-        # "test_motifs_cell_specific": test_motifs_cell_specific,
-        # "shuffle_motifs": shuffle_motifs,
-        # "shuffle_motifs_cell_specific": shuffle_motifs_cell_specific,
-        "tag_to_numeric": tag_to_numeric,
-        "numeric_to_tag": numeric_to_tag,
-        "cell_types": cell_types,
-        "X_train": X_train,
-        "x_train_cell_type": x_train_cell_type,
-    }
-
-    return encode_data_dict
-
-
-def load_data_deg(
-    data_path: str = "./data/train.json",
-    max_seq_len: int = 200,
-    limit_total_sequences: int = 0,
-    num_sampling_to_compare_cells: int = 1000,
-):
-    # Preprocessing data
-    df = pd.read_json("./data/train.json", lines=True)
-    df["sum_deg"] = df["deg_pH10"].apply(sum)
-    df["sequence"] = df["sequence"].str.slice(0, 68)
-    df["sequence"] = df["sequence"].str.replace("U", "T")
-    df = pd.DataFrame({"sum_deg": df["sum_deg"], "sequence": df["sequence"]})
-    df["TAG"] = "middle"
-    deg_mean = df["sum_deg"].mean()
-    deg_std = df["sum_deg"].std()
-    df.loc[df["sum_deg"]<deg_mean-deg_std, ["TAG"]] = "low"
-    df.loc[df["sum_deg"]>deg_mean+deg_std, ["TAG"]] = "high"
-
-    # Creating sequence dataset
-    nucleotides = ["A", "C", "G", "T"]
-    x_train_seq = np.array([one_hot_encode_r(x, nucleotides, max_seq_len=max_seq_len) for x in df["sequence"] if "N" not in x])
-    X_train = np.array([x.T.tolist() for x in x_train_seq])
-    X_train[X_train == 0] = -1
-
-    # Creating labels
-    tag_to_numeric = {x: n for n, x in enumerate(df["TAG"].unique(), 1)}
-    numeric_to_tag = dict(enumerate(df["TAG"].unique(), 1))
-    cell_types = list(numeric_to_tag.keys())
-    x_train_cell_type = torch.tensor([tag_to_numeric[x] for x in df["TAG"]])
-
-    # Collecting variables into a dict
-    encode_data_dict = {
-        # "train_motifs": train_motifs,
-        # "train_motifs_cell_specific": train_motifs_cell_specific,
-        # "test_motifs": test_motifs,
-        # "test_motifs_cell_specific": test_motifs_cell_specific,
-        # "shuffle_motifs": shuffle_motifs,
-        # "shuffle_motifs_cell_specific": shuffle_motifs_cell_specific,
         "tag_to_numeric": tag_to_numeric,
         "numeric_to_tag": numeric_to_tag,
         "cell_types": cell_types,

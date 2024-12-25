@@ -10,13 +10,9 @@ from dnadiffusion.utils.sample_util import create_sample
 
 
 def sample(model_path: str, num_samples: int = 1000, length: int = 200):
-    # Instantiating data and model
-    print("Loading data")
-    data = load_data(
-        #data_path="FiveSpecies_Cao_allutr_with_energy_structure.fasta",
-        data_path="./data/4.1_train_data_GSM3130435_egfp_unmod_1_BiologyFeatures.csv",
-        #num_sampling_to_compare_cells=1000,
-    )
+
+    # Ensure length is divisible by 8 for UNet
+    length = length if length % 8 == 0 else (length // 8 + 1) * 8
 
     print("Instantiating unet")
     unet = UNet(
@@ -42,21 +38,22 @@ def sample(model_path: str, num_samples: int = 1000, length: int = 200):
     diffusion = diffusion.to("cuda")
 
     # Generating cell specific samples
-    cell_num_list = data["cell_types"]
-    cell_list = list(data["tag_to_numeric"].keys())
+    cell_num_list = checkpoint_dict["tag"]["cell_types"]
+    numeric_to_tag = checkpoint_dict["tag"]["numeric_to_tag"]
 
     for i in cell_num_list:
-        print(f"Generating {num_samples} samples for label {data['numeric_to_tag'][i]}")
+        print(f"Generating {num_samples} samples for label {numeric_to_tag[i]}")
         create_sample(
             diffusion,
-            conditional_numeric_to_tag=data["numeric_to_tag"],
-            cell_types=data["cell_types"],
+            conditional_numeric_to_tag=numeric_to_tag,
+            cell_types=cell_num_list,
             number_of_samples=int(num_samples / 10),
             group_number=i,
             cond_weight_to_metric=1,
             save_timesteps=False,
             save_dataframe=True,
             length=length,
+            right_aligned=True
         )
 
 

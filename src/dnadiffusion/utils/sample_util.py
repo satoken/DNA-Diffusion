@@ -20,6 +20,7 @@ def create_sample(
     save_dataframe: bool = False,
     generate_attention_maps: bool = False,
     length: int = 200,
+    right_aligned = False,
     output_prefix: str = "final",
 ):
     nucleotides = ["A", "C", "G", "T"]
@@ -46,13 +47,13 @@ def create_sample(
         if save_timesteps:
             seqs_to_df = {}
             for en, step in enumerate(sampled_images):
-                seqs_to_df[en] = [convert_to_seq(x, nucleotides, length) for x in step]
+                seqs_to_df[en] = [convert_to_seq(x, nucleotides, length, right_aligned) for x in step]
             final_sequences.append(pd.DataFrame(seqs_to_df))
 
         if save_dataframe:
             # Only using the last timestep
             for en, step in enumerate(sampled_images[-1]):
-                final_sequences.append(convert_to_seq(step, nucleotides, length))
+                final_sequences.append(convert_to_seq(step, nucleotides, length, right_aligned))
         else:
             for n_b, x in enumerate(sampled_images[-1]):
                 seq_final = f">seq_test_{n_a}_{n_b}\n" + "".join(

@@ -1,6 +1,8 @@
 import copy
+import random
 from typing import Any
 
+import numpy as np
 import torch
 import torchvision.transforms as T
 from accelerate import Accelerator
@@ -24,7 +26,8 @@ class TrainLoop:
         log_step_show: int = 50,
         sample_epoch: int = 500,
         save_epoch: int = 500,
-        model_name: str = "model_48k_sequences_per_group_K562_hESCT0_HepG2_GM12878_12k",
+        #model_name: str = "model_48k_sequences_per_group_K562_hESCT0_HepG2_GM12878_12k",
+        out_dir: str = "checkpoints",
         image_size: int = 200,
         num_sampling_to_compare_cells: int = 1000,
         batch_size: int = 960,
@@ -37,7 +40,7 @@ class TrainLoop:
         self.log_step_show = log_step_show
         self.sample_epoch = sample_epoch
         self.save_epoch = save_epoch
-        self.model_name = model_name
+        self.out_dir = out_dir
         self.image_size = image_size
         self.num_sampling_to_compare_cells = num_sampling_to_compare_cells
 
@@ -137,10 +140,21 @@ class TrainLoop:
             "optimizer": self.optimizer.state_dict(),
             "epoch": epoch,
             "ema_model": self.accelerator.get_state_dict(self.ema_model),
+            "random": random.getstate(),
+            "np_random": np.random.get_state(),
+            "torch": torch.get_rng_state(),
+            "torch_random": torch.random.get_rng_state(),
+            "cuda_random": torch.cuda.get_rng_state(),
+            "cuda_random_all": torch.cuda.get_rng_state_all(),
+            "tag": {
+                "numeric_to_tag": self.encode_data["numeric_to_tag"],
+                "tag_to_numeric": self.encode_data["tag_to_numeric"],
+                "cell_types": self.encode_data["cell_types"],
+            },
         }
         torch.save(
             checkpoint_dict,
-            f"checkpoints/epoch_{epoch}_{self.model_name}.pt",
+            f"{self.out_dir}/epoch_{epoch}.pt",
         )
 
     def load(self, path):
@@ -151,5 +165,12 @@ class TrainLoop:
 
         if self.accelerator.is_main_process:
             self.ema_model.load_state_dict(checkpoint_dict["ema_model"])
+
+        random.setstate(checkpoint_dict["random"])
+        np.random.set_state(checkpoint_dict["np_random"])
+        torch.set_rng_state(checkpoint_dict["torch"])
+        torch.random.set_rng_state(checkpoint_dict["torch_random"])
+        torch.cuda.set_rng_state(checkpoint_dict["cuda_random"])
+        torch.cuda.torch.cuda.set_rng_state_all(checkpoint_dict["cuda_random_all"])
 
         self.train_loop()
