@@ -15,22 +15,28 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
     accelerator = Accelerator(split_batches=True, log_with=["wandb"])
     accelerator.init_trackers(project_name="dnadiffusion", init_kwargs={"wandb": {"mode": "offline"}})
 
+    # Ensure length is divisible by 8 for UNet
+    length = length if length % 8 == 0 else (length // 8 + 1) * 8
+    right_aligned = False
+
     if data_type == "mfe":
-        data = load_data_mfe(data_path=data_path, max_seq_len=length)
+        right_aligned = True
+        data = load_data_mfe(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     elif data_type == "rnaseq":
-        data = load_data_rnaseq(data_path=data_path, max_seq_len=length)
+        right_aligned = True
+        data = load_data_rnaseq(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     elif data_type == "te":
-        data = load_data_te(data_path=data_path, max_seq_len=length)
+        right_aligned = True
+        data = load_data_te(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     elif data_type == "rl":
-        data = load_data_rl(data_path=data_path, max_seq_len=length)
+        right_aligned = True
+        data = load_data_rl(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     elif data_type == "deg":
-        data = load_data_deg(data_path=data_path, max_seq_len=length)
+        right_aligned = True
+        data = load_data_deg(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     else:
         msg = f"Invalid data type: {data_type}"
         raise ValueError(msg)
-
-    # Ensure length is divisible by 8 for UNet
-    length = length if length % 8 == 0 else (length // 8 + 1) * 8
 
     unet = UNet(
         dim=length,
@@ -54,6 +60,7 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
         save_epoch=save_epoch,
         out_dir=out_dir,
         image_size=length,
+        right_aligned=right_aligned,
         num_sampling_to_compare_cells=1000,
         batch_size=batch_size,
     ).train_loop()
@@ -62,6 +69,7 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
 def load_data_mfe(
     data_path: str = "FiveSpecies_Cao_allutr_with_energy_structure.fasta",
     max_seq_len: int = 200,
+    right_aligned: bool = False,
 ):
     # Preprocessing data
     mfes, seqs = [], []
@@ -78,12 +86,13 @@ def load_data_mfe(
     df.loc[df["AVG MFE"]>am_mean+am_std, ["TAG"]] = "high"
     df.loc[df["AVG MFE"]<am_mean-am_std, ["TAG"]] = "low"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=True)
+    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
 
 
 def load_data_rnaseq(
     data_path: str = "./data/HEK_sequence.csv",
     max_seq_len: int = 200,
+    right_aligned: bool = False,
 ):
     # Preprocessing data
     df = pd.read_csv(data_path)
@@ -96,12 +105,13 @@ def load_data_rnaseq(
     df.loc[df["rnaseq_log"]<df["rnaseq_log"].quantile(0.33), ["TAG"]] = "low"
     df.loc[df["rnaseq_log"]>df["rnaseq_log"].quantile(0.66), ["TAG"]] = "high"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=True)
+    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
 
 
 def load_data_te(
     data_path: str = "./data/HEK_sequence.csv",
     max_seq_len: int = 200,
+    right_aligned: bool = False,
 ):
     # Preprocessing data
     df = pd.read_csv(data_path)
@@ -116,12 +126,13 @@ def load_data_te(
     df.loc[df["te_log"]<te_mean-te_std, ["TAG"]] = "low"
     df.loc[df["te_log"]>te_mean+te_std, ["TAG"]] = "high"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=True)
+    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
 
 
 def load_data_rl(
     data_path: str = "./data/4.1_train_data_GSM3130435_egfp_unmod_1_BiologyFeatures.csv",
     max_seq_len: int = 200,
+    right_aligned: bool = False,
 ):
     # Preprocessing data
     df = pd.read_csv(data_path)
@@ -131,12 +142,13 @@ def load_data_rl(
     df["TAG"] = "high"
     df.loc[df["rl"]<6.0, ["TAG"]] = "low"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=True)
+    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
 
 
 def load_data_deg(
     data_path: str = "./data/train.json",
     max_seq_len: int = 200,
+    right_aligned: bool = False,
     limit_total_sequences: int = 0,
     num_sampling_to_compare_cells: int = 1000,
 ):
@@ -152,7 +164,7 @@ def load_data_deg(
     df.loc[df["sum_deg"]<deg_mean-deg_std, ["TAG"]] = "low"
     df.loc[df["sum_deg"]>deg_mean+deg_std, ["TAG"]] = "high"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=True)
+    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
 
 
 if __name__ == "__main__":

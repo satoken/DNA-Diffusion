@@ -29,6 +29,7 @@ class TrainLoop:
         #model_name: str = "model_48k_sequences_per_group_K562_hESCT0_HepG2_GM12878_12k",
         out_dir: str = "checkpoints",
         image_size: int = 200,
+        right_aligned: bool = False,
         num_sampling_to_compare_cells: int = 1000,
         batch_size: int = 960,
     ):
@@ -42,6 +43,7 @@ class TrainLoop:
         self.save_epoch = save_epoch
         self.out_dir = out_dir
         self.image_size = image_size
+        self.right_aligned = right_aligned
         self.num_sampling_to_compare_cells = num_sampling_to_compare_cells
 
         if self.accelerator.is_main_process:
@@ -146,11 +148,15 @@ class TrainLoop:
             "torch_random": torch.random.get_rng_state(),
             "cuda_random": torch.cuda.get_rng_state(),
             "cuda_random_all": torch.cuda.get_rng_state_all(),
-            "tag": {
-                "numeric_to_tag": self.encode_data["numeric_to_tag"],
-                "tag_to_numeric": self.encode_data["tag_to_numeric"],
-                "cell_types": self.encode_data["cell_types"],
-            },
+            "tags": [
+                {
+                    "numeric_to_tag": self.encode_data["numeric_to_tag"],
+                    "tag_to_numeric": self.encode_data["tag_to_numeric"],
+                    "cell_types": self.encode_data["cell_types"],
+                },
+            ],
+            "length": self.image_size,
+            "right_aligned": self.right_aligned,
         }
         torch.save(
             checkpoint_dict,

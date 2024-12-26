@@ -9,10 +9,13 @@ from dnadiffusion.models.unet import UNet
 from dnadiffusion.utils.sample_util import create_sample
 
 
-def sample(model_path: str, num_samples: int = 1000, length: int = 200):
+def sample(model_path: str, num_samples: int = 1000):
 
-    # Ensure length is divisible by 8 for UNet
-    length = length if length % 8 == 0 else (length // 8 + 1) * 8
+    # Load checkpoint
+    print("Loading checkpoint")
+    checkpoint_dict = torch.load(model_path)
+    length = checkpoint_dict["length"]
+    right_aligned = checkpoint_dict["right_aligned"]
 
     print("Instantiating unet")
     unet = UNet(
@@ -27,10 +30,6 @@ def sample(model_path: str, num_samples: int = 1000, length: int = 200):
         unet,
         timesteps=50,
     )
-
-    # Load checkpoint
-    print("Loading checkpoint")
-    checkpoint_dict = torch.load(model_path)
     diffusion.load_state_dict(checkpoint_dict["model"])
 
     # Send model to device
@@ -38,8 +37,8 @@ def sample(model_path: str, num_samples: int = 1000, length: int = 200):
     diffusion = diffusion.to("cuda")
 
     # Generating cell specific samples
-    cell_num_list = checkpoint_dict["tag"]["cell_types"]
-    numeric_to_tag = checkpoint_dict["tag"]["numeric_to_tag"]
+    cell_num_list = checkpoint_dict["tags"][0]["cell_types"]
+    numeric_to_tag = checkpoint_dict["tags"][0]["numeric_to_tag"]
 
     for i in cell_num_list:
         print(f"Generating {num_samples} samples for label {numeric_to_tag[i]}")
@@ -53,7 +52,7 @@ def sample(model_path: str, num_samples: int = 1000, length: int = 200):
             save_timesteps=False,
             save_dataframe=True,
             length=length,
-            right_aligned=True
+            right_aligned=right_aligned
         )
 
 
@@ -61,7 +60,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="dnadiffusion")
     parser.add_argument("--model", help="model file")
     parser.add_argument("--num-samples", type=int, default=1000, help="the number of samples")
-    parser.add_argument("--length", type=int, default=200, help="sequence length")
     args = parser.parse_args()
 
-    sample(model_path=args.model, num_samples=args.num_samples, length=args.length)
+    sample(model_path=args.model, num_samples=args.num_samples)
