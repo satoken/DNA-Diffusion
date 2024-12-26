@@ -153,7 +153,7 @@ def load_data_deg(
     num_sampling_to_compare_cells: int = 1000,
 ):
     # Preprocessing data
-    df = pd.read_json("./data/train.json", lines=True)
+    df = pd.read_json(data_path, lines=True)
     df["sum_deg"] = df["deg_pH10"].apply(sum)
     df["sequence"] = df["sequence"].str.slice(0, 68)
     df["sequence"] = df["sequence"].str.replace("U", "T")
