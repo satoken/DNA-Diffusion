@@ -70,8 +70,8 @@ class Diffusion(nn.Module):
             context_mask = torch.ones_like(classes).to(device)
             # make 0 index unconditional
             # double the batch
-            classes = classes.repeat(2)
-            context_mask = context_mask.repeat(2)
+            classes = classes.repeat(2, 1)
+            context_mask = context_mask.repeat(2, 1)
             context_mask[n_sample:] = 0.0
             sampling_fn = partial(
                 self.p_sample_guided,
@@ -164,7 +164,7 @@ class Diffusion(nn.Module):
 
         x_noisy = self.q_sample(x_start=x_start, t=t, noise=noise)
 
-        context_mask = torch.bernoulli(torch.zeros(classes.shape[0]) + (1 - p_uncond)).to(device)
+        context_mask = torch.bernoulli(torch.zeros_like(classes) + (1 - p_uncond)).to(device)
 
         # Mask for unconditional guidance
         classes = classes * context_mask

@@ -17,7 +17,7 @@ def load_data(
     df: pd.DataFrame,
     max_seq_len: int = 200,
     right_aligned: bool = False,
-    tag_name: str = "TAG",
+    tag_name: list[str] = ["TAG"],
 ):
     # Creating sequence dataset
     nucleotides = ["A", "C", "G", "T"]
@@ -27,136 +27,31 @@ def load_data(
     X_train[X_train == 0] = -1
 
     # Creating labels
-    tag_to_numeric = {x: n for n, x in enumerate(df[tag_name][valid_indices].unique(), 1)}
-    numeric_to_tag = dict(enumerate(df[tag_name][valid_indices].unique(), 1))
-    cell_types = list(numeric_to_tag.keys())
-    x_train_cell_type = torch.tensor([tag_to_numeric[x] for x in df[tag_name][valid_indices]])
+    tags = [ ]
+    x_train_cell_type = []
+    for tag in tag_name:
+        tag_to_numeric = {x: n for n, x in enumerate(df[tag][valid_indices].unique(), 1)}
+        numeric_to_tag = dict(enumerate(df[tag][valid_indices].unique(), 1))
+        cell_types = list(numeric_to_tag.keys())
+        x_train_cell_type.append(torch.tensor([tag_to_numeric[x] for x in df[tag][valid_indices]]))
+
+        tags.append(
+            {
+                "name": tag,
+                "tag_to_numeric": tag_to_numeric,
+                "numeric_to_tag": numeric_to_tag,
+                "cell_types": cell_types,
+            }
+        )
 
     # Collecting variables into a dict
     encode_data_dict = {
-        "tag_to_numeric": tag_to_numeric,
-        "numeric_to_tag": numeric_to_tag,
-        "cell_types": cell_types,
         "X_train": X_train,
-        "x_train_cell_type": x_train_cell_type,
+        "x_train_cell_type": torch.stack(x_train_cell_type, dim=1),
+        "tags": tags,
     }
 
     return encode_data_dict
-
-
-def motifs_from_fasta(fasta: str):
-    print("Computing Motifs....")
-    os.system(f"gimme scan {fasta} -p  JASPAR2020_vertebrates -g hg38 -n 20> train_results_motifs.bed")
-    df_results_seq_guime = pd.read_csv("train_results_motifs.bed", sep="\t", skiprows=5, header=None)
-    df_results_seq_guime["motifs"] = df_results_seq_guime[8].apply(lambda x: x.split('motif_name "')[1].split('"')[0])
-
-    df_results_seq_guime[0] = df_results_seq_guime[0].apply(lambda x: "_".join(x.split("_")[:-1]))
-    df_results_seq_guime_count_out = df_results_seq_guime[[0, "motifs"]].groupby("motifs").count()
-    return df_results_seq_guime_count_out
-
-
-def save_fasta(df: pd.DataFrame, name: str, num_sequences: int, seq_to_subset_comp: bool = False) -> str:
-    fasta_path = f"{name}.fasta"
-    save_fasta_file = open(fasta_path, "w")
-    num_to_sample = df.shape[0]
-
-    # Subsetting sequences
-    if num_sequences and seq_to_subset_comp:
-        num_to_sample = num_sequences
-
-    # Sampling sequences
-    print(f"Sampling {num_to_sample} sequences")
-    write_fasta_component = "\n".join(
-        df[["dhs_id", "sequence", "TAG"]]
-        .head(num_to_sample)
-        .apply(lambda x: f">{x[0]}_TAG_{x[2]}\n{x[1]}", axis=1)
-        .values.tolist()
-    )
-    save_fasta_file.write(write_fasta_component)
-    save_fasta_file.close()
-
-    return fasta_path
-
-
-def generate_motifs_and_fastas(
-    df: pd.DataFrame, name: str, num_sequences: int, subset_list: list | None = None
-) -> dict[str, Any]:
-    print("Generating Motifs and Fastas...", name)
-    print("---" * 10)
-
-    # Saving fasta
-    if subset_list:
-        fasta_path = save_fasta(df, f"{name}_{'_'.join([str(c) for c in subset_list])}", num_sequences)
-    else:
-        fasta_path = save_fasta(df, name, num_sequences)
-
-    # Computing motifs
-    motifs = motifs_from_fasta(fasta_path)
-
-    # Generating subset specific motifs
-    final_subset_motifs = {}
-    for comp, v_comp in df.groupby("TAG"):
-        print(comp)
-        c_fasta = save_fasta(v_comp, f"{name}_{comp}", num_sequences, seq_to_subset_comp=True)
-        final_subset_motifs[comp] = motifs_from_fasta(c_fasta)
-
-    return {
-        "fasta_path": fasta_path,
-        "motifs": motifs,
-        "final_subset_motifs": final_subset_motifs,
-        "df": df,
-    }
-
-
-def preprocess_data(
-    input_csv: str,
-    subset_list: list | None = None,
-    limit_total_sequences: int | None = None,
-    number_of_sequences_to_motif_creation: int = 1000,
-    save_output: bool = True,
-):
-    # Reading the csv file
-    df = pd.read_csv(input_csv, sep="\t")
-
-    # Subsetting the dataframe
-    if subset_list:
-        print(" or ".join([f"TAG == {c}" for c in subset_list]))
-        df = df.query(" or ".join([f'TAG == "{c}" ' for c in subset_list]))
-        print("Subsetting...")
-
-    # Limiting the total number of sequences
-    if limit_total_sequences > 0:
-        print(f"Limiting total sequences to {limit_total_sequences}")
-        df = df.sample(limit_total_sequences)
-
-    # Creating train/test/shuffle groups
-    df_test = df[df["chr"] == "chr1"].reset_index(drop=True)
-    df_train_shuffled = df[df["chr"] == "chr2"].reset_index(drop=True)
-    df_train = df_train = df[(df["chr"] != "chr1") & (df["chr"] != "chr2")].reset_index(drop=True)
-
-    df_train_shuffled["sequence"] = df_train_shuffled["sequence"].apply(
-        lambda x: "".join(random.sample(list(x), len(x)))
-    )
-
-    # Getting motif information from the sequences
-    train = generate_motifs_and_fastas(df_train, "train", number_of_sequences_to_motif_creation, subset_list)
-    test = generate_motifs_and_fastas(df_test, "test", number_of_sequences_to_motif_creation, subset_list)
-    train_shuffled = generate_motifs_and_fastas(
-        df_train_shuffled,
-        "train_shuffled",
-        number_of_sequences_to_motif_creation,
-        subset_list,
-    )
-
-    combined_dict = {"train": train, "test": test, "train_shuffled": train_shuffled}
-
-    # Writing to pickle
-    if save_output:
-        # Saving all train, test, train_shuffled dictionaries to pickle
-        with open("src/dnadiffusion/data/encode_data.pkl", "wb") as f:
-            pickle.dump(combined_dict, f)
-
-    return combined_dict
 
 
 class SequenceDataset(Dataset):

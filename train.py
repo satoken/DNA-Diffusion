@@ -34,6 +34,9 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
     elif data_type == "deg":
         right_aligned = True
         data = load_data_deg(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+    elif data_type == "deg2":
+        right_aligned = True
+        data = load_data_deg2(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     else:
         msg = f"Invalid data type: {data_type}"
         raise ValueError(msg)
@@ -56,12 +59,10 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
         accelerator=accelerator,
         epochs=epochs,
         log_step_show=500,
-        sample_epoch=500,
         save_epoch=save_epoch,
         out_dir=out_dir,
         image_size=length,
         right_aligned=right_aligned,
-        num_sampling_to_compare_cells=1000,
         batch_size=batch_size,
     ).train_loop()
 
@@ -86,7 +87,7 @@ def load_data_mfe(
     df.loc[df["AVG MFE"]>am_mean+am_std, ["TAG"]] = "high"
     df.loc[df["AVG MFE"]<am_mean-am_std, ["TAG"]] = "low"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
 
 def load_data_rnaseq(
@@ -105,7 +106,7 @@ def load_data_rnaseq(
     df.loc[df["rnaseq_log"]<df["rnaseq_log"].quantile(0.33), ["TAG"]] = "low"
     df.loc[df["rnaseq_log"]>df["rnaseq_log"].quantile(0.66), ["TAG"]] = "high"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
 
 def load_data_te(
@@ -126,7 +127,7 @@ def load_data_te(
     df.loc[df["te_log"]<te_mean-te_std, ["TAG"]] = "low"
     df.loc[df["te_log"]>te_mean+te_std, ["TAG"]] = "high"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
 
 def load_data_rl(
@@ -142,7 +143,7 @@ def load_data_rl(
     df["TAG"] = "high"
     df.loc[df["rl"]<6.0, ["TAG"]] = "low"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
 
 def load_data_deg(
@@ -164,14 +165,31 @@ def load_data_deg(
     df.loc[df["sum_deg"]<deg_mean-deg_std, ["TAG"]] = "low"
     df.loc[df["sum_deg"]>deg_mean+deg_std, ["TAG"]] = "high"
 
-    return load_data(df, max_seq_len=max_seq_len, tag_name="TAG", right_aligned=right_aligned)
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
+
+
+def load_data_deg2(
+    data_path: str = "./data/4.1_train_data_GSM3130435_egfp_unmod_1_BiologyFeatures.csv",
+    max_seq_len: int = 200,
+    right_aligned: bool = False,
+):
+    # Preprocessing data
+    df = pd.read_csv(data_path)
+    df = pd.DataFrame({"deg": df["deg"], "sequence": df["utr"]})
+    df["TAG"] = "middle"
+    deg_mean = df["deg"].mean()
+    deg_std = df["deg"].std()
+    df.loc[df["deg"]<deg_mean-deg_std, ["TAG"]] = "low"
+    df.loc[df["deg"]>deg_mean+deg_std, ["TAG"]] = "high"
+
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="dnadiffusion")
     parser.add_argument("--input", type=str, help="input file")
     parser.add_argument("--output", type=str, default="checkpoints", help="output dir")
-    parser.add_argument("--type", type=str, choices=["mfe", "rnaseq", "te", "rl", "deg"], help="data type")
+    parser.add_argument("--type", type=str, choices=["mfe", "rnaseq", "te", "rl", "deg", "deg2"], help="data type")
     parser.add_argument("--batch-size", type=int, default=480, help="batch size")
     parser.add_argument("--epochs", type=int, default=10000, help="the number of epochs")
     parser.add_argument("--save-epoch", type=int, default=500, help="the interval of saving the model")

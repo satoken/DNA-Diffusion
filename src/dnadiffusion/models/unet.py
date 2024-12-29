@@ -12,11 +12,11 @@ class UNet(nn.Module):
         self,
         dim: int,
         init_dim: int | None = None,
-        dim_mults: tuple = (1, 2, 4),
+        dim_mults: tuple[int] = (1, 2, 4),
         channels: int = 1,
         resnet_block_groups: int = 8,
         learned_sinusoidal_dim: int = 18,
-        num_classes: int = 10,
+        num_classes: tuple[int] = (10,),
         output_attention: bool = False,
     ) -> None:
         super().__init__()
@@ -50,7 +50,7 @@ class UNet(nn.Module):
         )
 
         if num_classes is not None:
-            self.label_emb = nn.Embedding(num_classes, time_dim)
+            self.label_emb = nn.ModuleList([nn.Embedding(n, time_dim) for n in num_classes])
 
         # layers
         self.downs = nn.ModuleList([])
@@ -111,10 +111,11 @@ class UNet(nn.Module):
         t_cross = t_start.clone()
 
         if classes is not None:
-            t_start += self.label_emb(classes)
-            t_mid += self.label_emb(classes)
-            t_end += self.label_emb(classes)
-            t_cross += self.label_emb(classes)
+            for i, emb in enumerate(self.label_emb):
+                t_start += emb(classes[:, i])
+                t_mid += emb(classes[:, i])
+                t_end += emb(classes[:, i])
+                t_cross += emb(classes[:, i])
 
         h = []
 

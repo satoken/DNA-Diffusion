@@ -44,10 +44,10 @@ def sample(model_path: str, num_samples: int = 1000):
         print(f"Generating {num_samples} samples for label {numeric_to_tag[i]}")
         create_sample(
             diffusion,
-            conditional_numeric_to_tag=numeric_to_tag,
-            cell_types=cell_num_list,
-            number_of_samples=int(num_samples / 10),
-            group_number=i,
+            cond_name="_".join([numeric_to_tag[i] for i in (i,)]),
+            #cell_types=cell_num_list,
+            number_of_samples=num_samples // 10,
+            group_number=(i,),
             cond_weight_to_metric=1,
             save_timesteps=False,
             save_dataframe=True,
