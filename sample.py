@@ -1,4 +1,5 @@
 import argparse
+import itertools
 
 import torch
 
@@ -30,24 +31,34 @@ def sample(model_path: str, num_samples: int = 1000):
         unet,
         timesteps=50,
     )
-    diffusion.load_state_dict(checkpoint_dict["model"])
+
+    # compatibility with older checkpoints
+    state_dict = checkpoint_dict["model"]
+    new_state_dict = {}
+    for key, value in state_dict.items():
+        if key == "model.label_emb.weight":
+            new_key = "model.label_emb.0.weight"
+        else:
+            new_key = key
+        new_state_dict[new_key] = value
+
+    diffusion.load_state_dict(new_state_dict)
 
     # Send model to device
     print("Sending model to device")
     diffusion = diffusion.to("cuda")
 
     # Generating cell specific samples
-    cell_num_list = checkpoint_dict["tags"][0]["cell_types"]
-    numeric_to_tag = checkpoint_dict["tags"][0]["numeric_to_tag"]
-
-    for i in cell_num_list:
-        print(f"Generating {num_samples} samples for label {numeric_to_tag[i]}")
+    cell_num_lists = [ tag["cell_types"] for tag in checkpoint_dict["tags"] ]
+    for group_numbers in itertools.product(*cell_num_lists):
+        cond_name = [ checkpoint_dict["tags"][i]["numeric_to_tag"][group_numbers[i]] for i in range(len(group_numbers)) ]
+        cond_name = "_".join(cond_name)
+        print(f"Generating {num_samples} samples for labels {cond_name}")
         create_sample(
             diffusion,
-            cond_name="_".join([numeric_to_tag[i] for i in (i,)]),
-            #cell_types=cell_num_list,
+            cond_name=cond_name,
             number_of_samples=num_samples // 10,
-            group_number=(i,),
+            group_number=group_numbers,
             cond_weight_to_metric=1,
             save_timesteps=False,
             save_dataframe=True,

@@ -25,6 +25,9 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
     elif data_type == "rnaseq":
         right_aligned = True
         data = load_data_rnaseq(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+    elif data_type == "rnaseq2":
+        right_aligned = True
+        data = load_data_rnaseq2(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     elif data_type == "te":
         right_aligned = True
         data = load_data_te(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
@@ -37,6 +40,9 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
     elif data_type == "deg2":
         right_aligned = True
         data = load_data_deg2(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+    elif data_type == "rl_mfe":
+        right_aligned = True
+        data = load_data_rl_mfe(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
     else:
         msg = f"Invalid data type: {data_type}"
         raise ValueError(msg)
@@ -108,6 +114,24 @@ def load_data_rnaseq(
 
     return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
+def load_data_rnaseq2(
+    data_path: str,
+    max_seq_len: int = 200,
+    right_aligned: bool = False,
+):
+    # Preprocessing data
+    df = pd.read_csv(data_path)
+    df["rnaseq_log"] = df.loc[:, "rnaseq_HEK_fold0":"rnaseq_pc3_fold9"].mean(axis=1)
+    df = pd.DataFrame({"rnaseq_log": df["rnaseq_log"], "sequence": df["utr"]})
+    #df["sequence"] = df["sequence"].str.replace("<pad>", "")
+    df["len"] = df["sequence"].apply(len)
+    #df["AVG rl"] = df["rl"] / df["len"]
+    #df = df[df["len"]>=max_seq_len]
+    df["TAG"] = "middle"
+    df.loc[df["rnaseq_log"]<df["rnaseq_log"].quantile(0.33), ["TAG"]] = "low"
+    df.loc[df["rnaseq_log"]>df["rnaseq_log"].quantile(0.66), ["TAG"]] = "high"
+
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
 def load_data_te(
     data_path: str = "./data/HEK_sequence.csv",
@@ -185,11 +209,35 @@ def load_data_deg2(
     return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
 
 
+def load_data_rl_mfe(
+    data_path: str,
+    max_seq_len: int = 200,
+    right_aligned: bool = False,
+):
+    # Preprocessing data
+    df = pd.read_csv(data_path)
+    df = pd.DataFrame({"rl value": df["rl"], "mfe value": df["mfe"], "sequence": df["utr"]})
+    df["len"] = df["sequence"].apply(len)
+    df["AVG rl"] = df["rl value"] / df["len"]
+    df["AVG mfe"] = df["mfe value"] / df["len"]
+
+    df["rl"] = "high"
+    df.loc[df["rl value"]<6.0, ["rl"]] = "low"
+
+    df["mfe"] = "middle"
+    am_mean = df["AVG mfe"].mean()
+    am_std = df["AVG mfe"].std()
+    df.loc[df["AVG mfe"]>am_mean+am_std, ["mfe"]] = "high"
+    df.loc[df["AVG mfe"]<am_mean-am_std, ["mfe"]] = "low"
+
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["rl", "mfe"], right_aligned=right_aligned)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="dnadiffusion")
     parser.add_argument("--input", type=str, help="input file")
     parser.add_argument("--output", type=str, default="checkpoints", help="output dir")
-    parser.add_argument("--type", type=str, choices=["mfe", "rnaseq", "te", "rl", "deg", "deg2"], help="data type")
+    parser.add_argument("--type", type=str, choices=["mfe", "rnaseq", "rnaseq2", "te", "rl", "deg", "deg2", "rl_mfe"], help="data type")
     parser.add_argument("--batch-size", type=int, default=480, help="batch size")
     parser.add_argument("--epochs", type=int, default=10000, help="the number of epochs")
     parser.add_argument("--save-epoch", type=int, default=500, help="the interval of saving the model")
