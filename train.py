@@ -22,27 +22,39 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
     if data_type == "mfe":
         right_aligned = True
         data = load_data_mfe(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
+    elif data_type == "mfe2":
+        right_aligned = True
+        data = load_data_mfe2(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
     elif data_type == "rnaseq":
         right_aligned = True
         data = load_data_rnaseq(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
     elif data_type == "rnaseq2":
         right_aligned = True
         data = load_data_rnaseq2(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
     elif data_type == "te":
         right_aligned = True
         data = load_data_te(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
     elif data_type == "rl":
         right_aligned = True
         data = load_data_rl(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
     elif data_type == "deg":
         right_aligned = True
         data = load_data_deg(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
     elif data_type == "deg2":
         right_aligned = True
         data = load_data_deg2(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,)
     elif data_type == "rl_mfe":
         right_aligned = True
         data = load_data_rl_mfe(data_path=data_path, max_seq_len=length, right_aligned=right_aligned)
+        num_classes = (10,10)
     else:
         msg = f"Invalid data type: {data_type}"
         raise ValueError(msg)
@@ -52,6 +64,7 @@ def train(data_path: str, data_type: str, batch_size: int, epochs: int, save_epo
         channels=1,
         dim_mults=(1, 2, 4),
         resnet_block_groups=4,
+        num_classes=num_classes
     )
 
     diffusion = Diffusion(
@@ -94,6 +107,26 @@ def load_data_mfe(
     df.loc[df["AVG MFE"]<am_mean-am_std, ["TAG"]] = "low"
 
     return load_data(df, max_seq_len=max_seq_len, tag_name=["TAG"], right_aligned=right_aligned)
+
+
+def load_data_mfe2(
+    data_path: str,
+    max_seq_len: int = 200,
+    right_aligned: bool = False,
+):
+    # Preprocessing data
+    df = pd.read_csv(data_path)
+    df = pd.DataFrame({"mfe value": df["mfe"], "sequence": df["utr"]})
+    df["len"] = df["sequence"].apply(len)
+    df["AVG mfe"] = df["mfe value"] / df["len"]
+
+    df["mfe"] = "middle"
+    am_mean = df["AVG mfe"].mean()
+    am_std = df["AVG mfe"].std()
+    df.loc[df["AVG mfe"]>am_mean+am_std, ["mfe"]] = "high"
+    df.loc[df["AVG mfe"]<am_mean-am_std, ["mfe"]] = "low"
+
+    return load_data(df, max_seq_len=max_seq_len, tag_name=["mfe"], right_aligned=right_aligned)
 
 
 def load_data_rnaseq(
@@ -237,7 +270,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="dnadiffusion")
     parser.add_argument("--input", type=str, help="input file")
     parser.add_argument("--output", type=str, default="checkpoints", help="output dir")
-    parser.add_argument("--type", type=str, choices=["mfe", "rnaseq", "rnaseq2", "te", "rl", "deg", "deg2", "rl_mfe"], help="data type")
+    parser.add_argument("--type", type=str, choices=["mfe", "mfe2", "rnaseq", "rnaseq2", "te", "rl", "deg", "deg2", "rl_mfe"], help="data type")
     parser.add_argument("--batch-size", type=int, default=480, help="batch size")
     parser.add_argument("--epochs", type=int, default=10000, help="the number of epochs")
     parser.add_argument("--save-epoch", type=int, default=500, help="the interval of saving the model")

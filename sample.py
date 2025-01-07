@@ -10,13 +10,14 @@ from dnadiffusion.models.unet import UNet
 from dnadiffusion.utils.sample_util import create_sample
 
 
-def sample(model_path: str, num_samples: int = 1000):
+def sample(model_path: str, num_samples: int = 1000, output_prefix: str = "final"):
 
     # Load checkpoint
     print("Loading checkpoint")
     checkpoint_dict = torch.load(model_path)
     length = checkpoint_dict["length"]
     right_aligned = checkpoint_dict["right_aligned"]
+    n_tags = len(checkpoint_dict["tags"])
 
     print("Instantiating unet")
     unet = UNet(
@@ -24,6 +25,7 @@ def sample(model_path: str, num_samples: int = 1000):
         channels=1,
         dim_mults=(1, 2, 4),
         resnet_block_groups=4,
+        num_classes=(10,)*n_tags,
     )
 
     print("Instantiating diffusion class")
@@ -57,6 +59,7 @@ def sample(model_path: str, num_samples: int = 1000):
         create_sample(
             diffusion,
             cond_name=cond_name,
+            output_prefix=output_prefix,
             number_of_samples=num_samples // 10,
             group_number=group_numbers,
             cond_weight_to_metric=1,
@@ -71,6 +74,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="dnadiffusion")
     parser.add_argument("--model", help="model file")
     parser.add_argument("--num-samples", type=int, default=1000, help="the number of samples")
+    parser.add_argument("--output-prefix", default="final", help="output prefix for samples")
     args = parser.parse_args()
 
-    sample(model_path=args.model, num_samples=args.num_samples)
+    sample(model_path=args.model, num_samples=args.num_samples, output_prefix=args.output_prefix)
