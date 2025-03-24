@@ -10,7 +10,7 @@ from dnadiffusion.models.unet import UNet
 from dnadiffusion.utils.sample_util import create_sample
 
 
-def sample(model_path: str, num_samples: int = 1000, output_prefix: str = "final"):
+def sample(model_path: str, num_samples: int = 1000, sample_bs: int = 10, output_prefix: str = "final"):
 
     # Load checkpoint
     print("Loading checkpoint")
@@ -60,7 +60,8 @@ def sample(model_path: str, num_samples: int = 1000, output_prefix: str = "final
             diffusion,
             cond_name=cond_name,
             output_prefix=output_prefix,
-            number_of_samples=num_samples // 10,
+            number_of_samples=num_samples // sample_bs,
+            sample_bs=sample_bs,
             group_number=group_numbers,
             cond_weight_to_metric=1,
             save_timesteps=False,
@@ -74,7 +75,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="dnadiffusion")
     parser.add_argument("--model", help="model file")
     parser.add_argument("--num-samples", type=int, default=1000, help="the number of samples")
+    parser.add_argument("--sample-bs", type=int, default=10, help="sample batch size")
     parser.add_argument("--output-prefix", default="final", help="output prefix for samples")
     args = parser.parse_args()
 
-    sample(model_path=args.model, num_samples=args.num_samples, output_prefix=args.output_prefix)
+    sample(model_path=args.model, num_samples=args.num_samples, sample_bs=args.sample_bs, output_prefix=args.output_prefix)

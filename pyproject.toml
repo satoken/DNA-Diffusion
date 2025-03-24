@@ -13,7 +13,7 @@ dynamic = ["version"]
 classifiers = [
     "Programming Language :: Python :: 3 :: Only",
 ]
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
   #"accelerate==0.24.1",
   "accelerate",
@@ -132,7 +132,7 @@ exclude_lines = [
 ]
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.11"
 
 [[tool.mypy.overrides]]
 module = [
@@ -163,7 +163,7 @@ allow-direct-references = true
 path = "src/dnadiffusion/__about__.py"
 
 [tool.hatch.envs.default]
-python = "3.10"
+python = "3.11"
 path = ".venv"
 dependencies = [
     "mkdocs-material==9.4.8",
@@ -173,7 +173,7 @@ dependencies = [
     "pytest==7.4.3",
     "pytest-asyncio==0.21.1",
     "pytest-cov==4.1.0",
-    "ruff==0.1.6",
+    "ruff",
     "types-tqdm==4.66.0.4",
     "xdoctest==1.1.2",
 ]

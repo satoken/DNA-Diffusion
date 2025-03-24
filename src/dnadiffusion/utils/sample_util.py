@@ -15,6 +15,7 @@ def create_sample(
     cond_name: str,
     group_number: tuple[int],
     number_of_samples: int = 1000,
+    sample_bs: int = 10,
     cond_weight_to_metric: int = 0,
     save_timesteps: bool = False,
     save_dataframe: bool = False,
@@ -26,7 +27,6 @@ def create_sample(
     nucleotides = ["A", "C", "G", "T"]
     final_sequences = []
     for n_a in tqdm(range(number_of_samples)):
-        sample_bs = 10
         # if group_number:
         #     sampled = torch.from_numpy(np.array([group_number] * sample_bs))
         # else:
